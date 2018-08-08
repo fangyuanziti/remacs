@@ -1,6 +1,6 @@
 //! Emacs!
 
-use cfg_if::cfg_if;
+use cfg_if::{__cfg_if_apply, __cfg_if_items, cfg_if};
 
 use remacs_macros::lisp_fn;
 

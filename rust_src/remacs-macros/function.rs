@@ -1,6 +1,6 @@
 use syn;
 
-use quote::quote;
+use quote::{quote, quote_each_token, quote_spanned};
 
 type Result<T> = ::std::result::Result<T, &'static str>;
 

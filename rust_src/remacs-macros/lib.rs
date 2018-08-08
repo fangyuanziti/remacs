@@ -10,7 +10,7 @@ extern crate syn;
 
 use lazy_static::lazy_static;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, quote_each_token, quote_spanned};
 use regex::Regex;
 
 mod function;

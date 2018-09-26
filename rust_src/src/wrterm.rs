@@ -32,6 +32,16 @@ pub use crate::webrender::display_info::{DisplayInfo, DisplayInfoRef};
 pub type DisplayRef = ExternalPtr<Display>;
 pub type ImageRef = ExternalPtr<WRImage>;
 
+mod color {
+    use std::collections::HashMap;
+
+    include!(concat!(env!("OUT_DIR"), "/colors.rs"));
+
+    lazy_static! {
+        pub static ref COLOR_MAP: HashMap<&'static str, (u8, u8, u8)> = init_color();
+    }
+}
+
 #[no_mangle]
 pub static tip_frame: LispObject = Qnil;
 
@@ -74,14 +84,38 @@ pub extern "C" fn wr_get_baseline_offset(output: OutputRef) -> i32 {
     unimplemented!();
 }
 
-#[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn wr_defined_color(
-    frame: LispFrameRef,
-    color_name: *const libc::c_char,
-    color_def: XColor,
+    _frame: LispFrameRef,
+    color_name: *mut libc::c_char,
+    color_def: *mut XColor,
+    _alloc_p: bool,
 ) -> bool {
-    unimplemented!();
+    // TODO: support the Hex value string
+
+    let c_color = unsafe { CString::from_raw(color_name) };
+    let color = c_color
+        .to_str()
+        .ok()
+        .and_then(|color| self::color::COLOR_MAP.get::<str>(&color.to_lowercase()));
+
+    // throw back the c pointer
+    c_color.into_raw();
+
+    match color {
+        Some(c) => {
+            let (red, green, blue) = c.clone();
+            unsafe {
+                (*color_def).red = red as u16;
+                (*color_def).green = green as u16;
+                (*color_def).blue = blue as u16;
+                (*color_def).pixel = (blue as u64) << 32 | (green as u64) << 16 | red as u64;
+            }
+
+            true
+        }
+        _ => false,
+    }
 }
 
 #[allow(unused_variables)]
@@ -422,7 +456,8 @@ pub fn x_open_connection(
 /// Internal function called by `display-color-p', which see.
 #[lisp_fn(min = "0")]
 pub fn xw_display_color_p(_terminal: LispObject) -> bool {
-    unimplemented!();
+    // webrender support color display
+    true
 }
 
 /// Return t if the X display supports shades of gray.
@@ -432,7 +467,8 @@ pub fn xw_display_color_p(_terminal: LispObject) -> bool {
 /// If omitted or nil, that stands for the selected frame's display.
 #[lisp_fn(min = "0")]
 pub fn x_display_grayscale_p(_terminal: LispObject) -> bool {
-    unimplemented!();
+    // webrender support shades of gray
+    true
 }
 
 fn syms_of_wrfont() {

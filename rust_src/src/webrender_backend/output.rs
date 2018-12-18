@@ -204,6 +204,10 @@ impl Output {
 
         font_key
     }
+
+    pub fn get_color_bits(&self) -> u8 {
+        self.window.get_pixel_format().color_bits
+    }
 }
 
 pub type OutputRef = ExternalPtr<Output>;

@@ -24,6 +24,17 @@ use crate::{
     util::HandyDandyRectBuilder,
 };
 
+fn pixel_to_color(pixel: u64) -> ColorF {
+    let pixel_array: [u16; 4] = unsafe { std::mem::transmute(pixel) };
+
+    ColorF::new(
+        pixel_array[0] as f32 / 255.0, // red
+        pixel_array[1] as f32 / 255.0, // green
+        pixel_array[2] as f32 / 255.0, // blue
+        1.0,
+    )
+}
+
 pub type FontRef = ExternalPtr<font>;
 impl Default for FontRef {
     fn default() -> Self {
@@ -116,7 +127,7 @@ extern "C" fn draw(
     to: i32,
     x: i32,
     y: i32,
-    _with_background: bool,
+    with_background: bool,
 ) -> i32 {
     let s: GlyphStringRef = s.into();
 
@@ -165,12 +176,22 @@ extern "C" fn draw(
         let text_bounds = (x, y).by(s.width as i32, s.height as i32);
         let layout = CommonItemProperties::new(text_bounds, space_and_clip);
 
+        let face = s.face;
+
+        // draw background
+        if with_background {
+            let background_color = pixel_to_color(unsafe { (*face).background });
+            builder.push_rect(&layout, background_color);
+        }
+
+        // draw foreground text
+        let foreground_color = pixel_to_color(unsafe { (*face).foreground });
         builder.push_text(
             &layout,
             layout.clip_rect,
             &glyph_instances,
             font_instance_key,
-            ColorF::new(0.0, 0.0, 0.0, 1.0),
+            foreground_color,
             None,
         );
     });

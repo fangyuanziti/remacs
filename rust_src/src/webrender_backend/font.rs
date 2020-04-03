@@ -411,6 +411,7 @@ extern "C" fn open(frame: *mut frame, font_entity: LispObject, pixel_size: i32) 
     wr_font.font.average_width = (font_advance.x * scale) as i32;
     wr_font.font.ascent = (scale * font_metrics.ascent) as i32;
     wr_font.font.descent = (-scale * font_metrics.descent) as i32;
+    wr_font.font.space_width = wr_font.font.average_width;
 
     wr_font.font.height =
         (scale * font_metrics.line_gap) as i32 + wr_font.font.ascent + wr_font.font.descent;

@@ -152,34 +152,43 @@ extern "C" fn draw(
     let from = from as usize;
     let to = to as usize;
 
-    let text_count = to - from;
+    let pixel_size = unsafe { (*s.font).pixel_size };
 
-    let font_width = s.width as f32 / (text_count) as f32;
+    let font_instance_key = output.add_font_instance(font_key, pixel_size);
 
-    output.display(|builder, api, txn, space_and_clip| {
+    output.display(|builder, api, space_and_clip| {
         let glyph_indices: Vec<u32> = s.get_chars()[from..to].iter().map(|c| *c as u32).collect();
 
-        let font_instance_key = api.generate_font_instance_key();
+        let glyph_dimensions = api.get_glyph_dimensions(font_instance_key, glyph_indices.clone());
 
-        let glyph_instances = glyph_indices
-            .into_iter()
-            .enumerate()
-            .map(|(i, index)| GlyphInstance {
+        let mut glyph_instances: Vec<GlyphInstance> = vec![];
+
+        for (i, index) in glyph_indices.into_iter().enumerate() {
+            let previous_char_width = if i == 0 {
+                0.0
+            } else {
+                let dimension = glyph_dimensions[i - 1];
+                match dimension {
+                    Some(d) => d.advance,
+                    None => 0.0,
+                }
+            };
+
+            let previous_char_start = if i == 0 {
+                x as f32
+            } else {
+                glyph_instances[i - 1].point.x
+            };
+
+            let start = previous_char_start + previous_char_width;
+
+            let glyph_instance = GlyphInstance {
                 index,
-                point: LayoutPoint::new(x as f32 + font_width * i as f32, y as f32),
-            })
-            .collect::<Vec<_>>();
+                point: LayoutPoint::new(start, y as f32),
+            };
 
-        let pixel_size = unsafe { (*s.font).pixel_size };
-
-        txn.add_font_instance(
-            font_instance_key,
-            font_key,
-            app_units::Au::from_px(pixel_size),
-            None,
-            None,
-            vec![],
-        );
+            glyph_instances.push(glyph_instance);
+        }
 
         let x = s.x;
         let y = s.y;

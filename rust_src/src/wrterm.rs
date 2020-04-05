@@ -205,7 +205,7 @@ pub extern "C" fn x_set_offset(frame: LispFrameRef, xoff: i32, yoff: i32, change
 
 #[no_mangle]
 pub extern "C" fn x_new_font(
-    frame: LispFrameRef,
+    mut frame: LispFrameRef,
     font_object: LispObject,
     fontset: i32,
 ) -> LispObject {
@@ -225,6 +225,8 @@ pub extern "C" fn x_new_font(
     }
 
     output.font = font.into();
+
+    frame.line_height = unsafe { (*font).height };
 
     font_object
 }

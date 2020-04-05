@@ -347,6 +347,8 @@ extern "C" fn open(frame: *mut frame, font_entity: LispObject, pixel_size: i32) 
     wr_font.font.height =
         (scale * font_metrics.line_gap) as i32 + wr_font.font.ascent + wr_font.font.descent;
 
+    wr_font.font.baseline_offset = 0;
+
     wr_font.font.driver = FONT_DRIVER.clone().as_mut();
 
     font_object.as_lisp_object()

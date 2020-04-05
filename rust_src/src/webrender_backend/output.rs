@@ -132,7 +132,7 @@ impl Output {
 
     pub fn display<F>(&mut self, f: F)
     where
-        F: Fn(&mut DisplayListBuilder, &mut RenderApi, SpaceAndClipInfo),
+        F: Fn(&mut DisplayListBuilder, SpaceAndClipInfo),
     {
         let pipeline_id = PipelineId(0, 0);
         if self.display_list_builder.is_none() {
@@ -145,7 +145,7 @@ impl Output {
         if let Some(builder) = &mut self.display_list_builder {
             let space_and_clip = SpaceAndClipInfo::root_scroll(pipeline_id);
 
-            f(builder, &mut self.render_api, space_and_clip);
+            f(builder, space_and_clip);
         }
     }
 
@@ -217,6 +217,14 @@ impl Output {
 
     pub fn get_color_bits(&self) -> u8 {
         self.window.get_pixel_format().color_bits
+    }
+
+    pub fn get_glyph_dimensions(
+        &self,
+        font: FontInstanceKey,
+        glyph_indices: Vec<GlyphIndex>,
+    ) -> Vec<Option<GlyphDimensions>> {
+        self.render_api.get_glyph_dimensions(font, glyph_indices)
     }
 }
 

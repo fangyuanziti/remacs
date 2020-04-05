@@ -147,19 +147,15 @@ extern "C" fn draw(
         unsafe { frame.output_data.wr.into() }
     };
 
-    let font_key = WRFontRef::from(s.font).font_key;
+    let font = WRFontRef::from(s.font);
 
     let from = from as usize;
     let to = to as usize;
 
-    let pixel_size = unsafe { (*s.font).pixel_size };
-
-    let font_instance_key = output.add_font_instance(font_key, pixel_size);
-
-    output.display(|builder, api, space_and_clip| {
+    output.display(|builder, space_and_clip| {
         let glyph_indices: Vec<u32> = s.get_chars()[from..to].iter().map(|c| *c as u32).collect();
 
-        let glyph_dimensions = api.get_glyph_dimensions(font_instance_key, glyph_indices.clone());
+        let glyph_dimensions = font.get_glyph_dimensions(glyph_indices.clone());
 
         let mut glyph_instances: Vec<GlyphInstance> = vec![];
 
@@ -210,7 +206,7 @@ extern "C" fn draw(
             &layout,
             layout.clip_rect,
             &glyph_instances,
-            font_instance_key,
+            font.font_instance_key,
             foreground_color,
             None,
         );
@@ -316,17 +312,28 @@ extern "C" fn list_family(f: *mut frame) -> LispObject {
 pub struct WRFont {
     // extend basic font
     pub font: font,
-    // webrender font key
-    pub font_key: FontKey,
+
     // font-kit font
     pub metrics: Metrics,
 
     pub font_backend: ManuallyDrop<Font>,
+
+    pub font_instance_key: FontInstanceKey,
+
+    pub output: OutputRef,
 }
 
 impl WRFont {
     pub fn glyph_for_char(&self, character: char) -> Option<u32> {
         self.font_backend.glyph_for_char(character)
+    }
+
+    pub fn get_glyph_dimensions(
+        &self,
+        glyph_indices: Vec<GlyphIndex>,
+    ) -> Vec<Option<GlyphDimensions>> {
+        self.output
+            .get_glyph_dimensions(self.font_instance_key, glyph_indices)
     }
 }
 
@@ -398,21 +405,21 @@ extern "C" fn open(frame: *mut frame, font_entity: LispObject, pixel_size: i32) 
         .select_by_postscript_name(&postscript_name)
         .unwrap();
 
-    // Create font key in webrender.
-    let font_key = output.add_font(&font);
-
     let mut wr_font = font_object
         .as_lisp_object()
         .as_font()
         .unwrap()
         .as_webrender_font();
 
+    wr_font.output = output;
     wr_font.font_backend = ManuallyDrop::new(font.load().unwrap());
 
-    let (font_metrics, font_advance) = {
-        let font = font.load().unwrap();
-        (font.metrics(), font.advance(33).unwrap())
-    };
+    // Create font key in webrender.
+    let font_key = output.add_font(&font);
+    wr_font.font_instance_key = output.add_font_instance(font_key, pixel_size as i32);
+
+    let font_metrics = wr_font.font_backend.metrics();
+    let font_advance = wr_font.font_backend.advance(33).unwrap();
 
     let scale = pixel_size as f32 / font_metrics.units_per_em as f32;
 
@@ -426,8 +433,6 @@ extern "C" fn open(frame: *mut frame, font_entity: LispObject, pixel_size: i32) 
         (scale * font_metrics.line_gap) as i32 + wr_font.font.ascent + wr_font.font.descent;
 
     wr_font.font.driver = FONT_DRIVER.clone().as_mut();
-
-    wr_font.font_key = font_key;
 
     font_object.as_lisp_object()
 }
@@ -451,10 +456,22 @@ extern "C" fn text_extents(
 ) {
     let font: WRFontRef = font.into();
 
+    let glyph_indices: Vec<u32> = unsafe { std::slice::from_raw_parts(code, nglyphs as usize) }
+        .iter()
+        .copied()
+        .collect();
+
+    let width: f32 = font
+        .get_glyph_dimensions(glyph_indices)
+        .into_iter()
+        .filter_map(|d| d)
+        .map(|d| d.advance)
+        .sum();
+
     unsafe {
         (*metrics).lbearing = 10;
         (*metrics).rbearing = 10;
-        (*metrics).width = font.font.average_width as i16;
+        (*metrics).width = width as i16;
         (*metrics).ascent = font.font.ascent as i16;
         (*metrics).descent = font.font.descent as i16;
     }

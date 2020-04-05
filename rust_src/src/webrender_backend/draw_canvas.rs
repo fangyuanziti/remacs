@@ -40,7 +40,6 @@ impl DrawCanvas {
 
     fn draw_char_glyph_string(&mut self, s: GlyphStringRef) {
         let font: WRFontRef = s.font.into();
-        let font_key = font.font_key;
 
         let x_start = s.x;
         let y_start = s.y + (font.font.ascent + (s.height - font.font.height) / 2);
@@ -50,16 +49,11 @@ impl DrawCanvas {
 
         let gc = s.gc;
 
-        let pixel_size = unsafe { (*s.font).pixel_size };
-
-        let font_instance_key = self.output.add_font_instance(font_key, pixel_size);
-
-        self.output.display(|builder, api, space_and_clip| {
+        self.output.display(|builder, space_and_clip| {
             let glyph_indices: Vec<u32> =
                 s.get_chars()[from..to].iter().map(|c| *c as u32).collect();
 
-            let glyph_dimensions =
-                api.get_glyph_dimensions(font_instance_key, glyph_indices.clone());
+            let glyph_dimensions = font.get_glyph_dimensions(glyph_indices.clone());
 
             let mut glyph_instances: Vec<GlyphInstance> = vec![];
 
@@ -117,7 +111,7 @@ impl DrawCanvas {
                     &layout,
                     layout.clip_rect,
                     &glyph_instances,
-                    font_instance_key,
+                    font.font_instance_key,
                     foreground_color,
                     None,
                 );

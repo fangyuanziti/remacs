@@ -20,10 +20,10 @@ use crate::{
     lisp::{ExternalPtr, LispObject},
     multibyte::LispStringRef,
     remacs_sys::{
-        font, font_driver, font_make_entity, font_make_object, font_metrics, font_property_index,
-        font_style_to_value, frame, glyph_string, Fassoc, Fcdr, Fcons, Fmake_symbol, Fnreverse,
-        Qbold, Qextra_bold, Qextra_light, Qitalic, Qlight, Qnil, Qnormal, Qoblique, Qsemi_bold,
-        Qultra_bold, Qwr, FONT_INVALID_CODE,
+        face, face_underline_type, font, font_driver, font_make_entity, font_make_object,
+        font_metrics, font_property_index, font_style_to_value, frame, glyph_string, Fassoc, Fcdr,
+        Fcons, Fmake_symbol, Fnreverse, Qbold, Qextra_bold, Qextra_light, Qitalic, Qlight, Qnil,
+        Qnormal, Qoblique, Qsemi_bold, Qultra_bold, Qwr, FONT_INVALID_CODE,
     },
     symbols::LispSymbolRef,
     util::HandyDandyRectBuilder,
@@ -123,6 +123,58 @@ impl From<LispObject> for LispFontLike {
     }
 }
 
+fn draw_underline(
+    builder: &mut DisplayListBuilder,
+    s: &GlyphStringRef,
+    font: &WRFontRef,
+    foreground_color: ColorF,
+    face: *mut face,
+    space_and_clip: SpaceAndClipInfo,
+) {
+    let x = s.x;
+    let y = s.y;
+
+    let underline_color = if unsafe { (*face).underline_defaulted_p() } {
+        foreground_color
+    } else {
+        pixel_to_color(unsafe { (*face).underline_color })
+    };
+
+    let thickness = if font.font.underline_thickness > 0 {
+        font.font.underline_thickness
+    } else {
+        if unsafe { (*face).underline_type() } == face_underline_type::FACE_UNDER_WAVE {
+            2
+        } else {
+            1
+        }
+    };
+
+    let position = if font.font.underline_position > 0 {
+        font.font.underline_position
+    } else {
+        y + s.height - thickness
+    };
+
+    let line_type = if unsafe { (*face).underline_type() } == face_underline_type::FACE_UNDER_WAVE {
+        LineStyle::Wavy
+    } else {
+        LineStyle::Solid
+    };
+
+    let info =
+        CommonItemProperties::new((x, position).by(s.width as i32, thickness), space_and_clip);
+
+    builder.push_line(
+        &info,
+        &info.clip_rect,
+        1.0,
+        LineOrientation::Horizontal,
+        &underline_color,
+        line_type,
+    );
+}
+
 extern "C" fn get_cache(f: *mut frame) -> LispObject {
     let frame = LispFrameRef::new(f);
     let output: OutputRef = unsafe { frame.output_data.wr.into() };
@@ -200,8 +252,14 @@ extern "C" fn draw(
             builder.push_rect(&layout, background_color);
         }
 
-        // draw foreground text
         let foreground_color = pixel_to_color(unsafe { (*face).foreground });
+
+        // draw underline
+        if unsafe { (*face).underline_p() } {
+            draw_underline(builder, &s, &font, foreground_color, face, space_and_clip);
+        }
+
+        // draw foreground text
         builder.push_text(
             &layout,
             layout.clip_rect,
@@ -428,6 +486,8 @@ extern "C" fn open(frame: *mut frame, font_entity: LispObject, pixel_size: i32) 
     wr_font.font.ascent = (scale * font_metrics.ascent) as i32;
     wr_font.font.descent = (-scale * font_metrics.descent) as i32;
     wr_font.font.space_width = wr_font.font.average_width;
+    wr_font.font.underline_thickness = (scale * font_metrics.underline_thickness) as i32;
+    wr_font.font.underline_position = (scale * font_metrics.underline_position) as i32;
 
     wr_font.font.height =
         (scale * font_metrics.line_gap) as i32 + wr_font.font.ascent + wr_font.font.descent;

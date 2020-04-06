@@ -211,6 +211,9 @@ pub fn wr_term_init(display_name: LispObject) -> DisplayInfoRef {
     dpyinfo_ref.smallest_font_height = 1;
     dpyinfo_ref.smallest_char_width = 1;
 
+    dpyinfo_ref.resx = 1.0;
+    dpyinfo_ref.resy = 1.0;
+
     // Set the name of the terminal.
     terminal.name = unsafe { xlispstrdup(display_name) };
 

@@ -91,18 +91,36 @@ pub extern "C" fn wr_defined_color(
 ) -> bool {
     // TODO: support the Hex value string
 
-    let c_color = unsafe { CString::from_raw(color_name) };
-    let color = c_color
-        .to_str()
-        .ok()
-        .and_then(|color| self::color::COLOR_MAP.get::<str>(&color.to_lowercase()));
+    let color = {
+        let c_color = unsafe { CString::from_raw(color_name) };
 
-    // throw back the c pointer
-    c_color.into_raw();
+        let color = c_color.to_str().ok().map(|c| c.to_lowercase());
+
+        // throw back the c pointer
+        c_color.into_raw();
+
+        color
+    };
+
+    if color.is_none() {
+        return false;
+    }
+
+    let color = color.unwrap();
+
+    let color = if color.starts_with('#') {
+        let red: u8 = u8::from_str_radix(&color[1..3], 16).unwrap();
+        let green: u8 = u8::from_str_radix(&color[3..5], 16).unwrap();
+        let blue: u8 = u8::from_str_radix(&color[5..7], 16).unwrap();
+        Some((red, green, blue))
+    } else {
+        self::color::COLOR_MAP
+            .get::<str>(&color.to_lowercase())
+            .copied()
+    };
 
     match color {
-        Some(c) => {
-            let (red, green, blue) = c.clone();
+        Some((red, green, blue)) => {
             unsafe {
                 (*color_def).red = red as u16;
                 (*color_def).green = green as u16;

@@ -165,9 +165,13 @@ fn draw_underline(
     let info =
         CommonItemProperties::new((x, position).by(s.width as i32, thickness), space_and_clip);
 
+    let visible_height = unsafe { (*s.row).visible_height };
+
+    let visible_rect = (x, y).by(s.width as i32, visible_height);
+
     builder.push_line(
         &info,
-        &info.clip_rect,
+        &visible_rect,
         1.0,
         LineOrientation::Horizontal,
         &underline_color,
@@ -241,15 +245,19 @@ extern "C" fn draw(
         let x = s.x;
         let y = s.y;
 
-        let text_bounds = (x, y).by(s.width as i32, s.height as i32);
-        let layout = CommonItemProperties::new(text_bounds, space_and_clip);
-
         let face = s.face;
+
+        let visible_height = unsafe { (*s.row).visible_height };
+
+        let visible_rect = (x, y).by(s.width as i32, visible_height);
 
         // draw background
         if with_background {
             let background_color = pixel_to_color(unsafe { (*face).background });
-            builder.push_rect(&layout, background_color);
+            builder.push_rect(
+                &CommonItemProperties::new(visible_rect, space_and_clip),
+                background_color,
+            );
         }
 
         let foreground_color = pixel_to_color(unsafe { (*face).foreground });
@@ -259,10 +267,12 @@ extern "C" fn draw(
             draw_underline(builder, &s, &font, foreground_color, face, space_and_clip);
         }
 
+        let text_bounds = (x, y).by(s.width as i32, s.height as i32);
+
         // draw foreground text
         builder.push_text(
-            &layout,
-            layout.clip_rect,
+            &CommonItemProperties::new(text_bounds, space_and_clip),
+            visible_rect,
             &glyph_instances,
             font.font_instance_key,
             foreground_color,

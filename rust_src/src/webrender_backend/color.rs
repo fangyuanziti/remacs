@@ -21,6 +21,14 @@ pub fn pixel_to_color(pixel: u64) -> ColorF {
     )
 }
 
+pub fn color_to_pixel(color: ColorF) -> u64 {
+    let red = color.r * 255.0;
+    let green = color.g * 255.0;
+    let blue = color.b * 255.0;
+
+    (blue as u64) << 32 | (green as u64) << 16 | (red as u64)
+}
+
 pub fn lookup_color_by_name_or_hex(color_string: &str) -> Option<(u8, u8, u8)> {
     // HEX value color, color_string is the hex string.
     if color_string.starts_with('#') {

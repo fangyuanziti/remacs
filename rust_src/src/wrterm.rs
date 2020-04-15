@@ -82,6 +82,19 @@ pub extern "C" fn wr_get_baseline_offset(output: OutputRef) -> i32 {
     0
 }
 
+pub fn decode_color(color_name: &str) -> Option<(u8, u8, u8)> {
+    if color_name.starts_with('#') {
+        let red: u8 = u8::from_str_radix(&color_name[1..3], 16).unwrap();
+        let green: u8 = u8::from_str_radix(&color_name[3..5], 16).unwrap();
+        let blue: u8 = u8::from_str_radix(&color_name[5..7], 16).unwrap();
+        Some((red, green, blue))
+    } else {
+        self::color::COLOR_MAP
+            .get::<str>(&color_name.to_lowercase())
+            .copied()
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn wr_defined_color(
     _frame: LispFrameRef,
@@ -108,16 +121,7 @@ pub extern "C" fn wr_defined_color(
 
     let color = color.unwrap();
 
-    let color = if color.starts_with('#') {
-        let red: u8 = u8::from_str_radix(&color[1..3], 16).unwrap();
-        let green: u8 = u8::from_str_radix(&color[3..5], 16).unwrap();
-        let blue: u8 = u8::from_str_radix(&color[5..7], 16).unwrap();
-        Some((red, green, blue))
-    } else {
-        self::color::COLOR_MAP
-            .get::<str>(&color.to_lowercase())
-            .copied()
-    };
+    let color = decode_color(&color);
 
     match color {
         Some((red, green, blue)) => {

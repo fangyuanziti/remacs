@@ -41,13 +41,34 @@ impl KboardRef {
 type RedisplayInterfaceRef = ExternalPtr<redisplay_interface>;
 unsafe impl Sync for RedisplayInterfaceRef {}
 
+extern "C" fn set_background_color(f: *mut Lisp_Frame, arg: LispObject, _old_val: LispObject) {
+    let (red, green, blue) =
+        crate::wrterm::decode_color(&format!("{}", arg.as_string().unwrap())).unwrap();
+
+    let frame: LispFrameRef = f.into();
+    let mut output: OutputRef = unsafe { frame.output_data.wr.into() };
+
+    use webrender::api::*;
+    let color = ColorF::new(
+        red as f32 / 255.0,   // red
+        green as f32 / 255.0, // green
+        blue as f32 / 255.0,  // blue
+        1.0,
+    );
+
+    use crate::util::HandyDandyRectBuilder;
+
+    output.color = color;
+    let screen_size = output.get_inner_size().unwrap();
+}
+
 fn get_frame_parm_handlers() -> [frame_parm_handler; 45] {
     // Keep this list in the same order as frame_parms in frame.c.
     // Use None for unsupported frame parameters.
     let handlers: [frame_parm_handler; 45] = [
         None,
         None,
-        None,
+        Some(set_background_color),
         None,
         None,
         None,

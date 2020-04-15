@@ -23,6 +23,8 @@ pub struct Output {
     pub document_id: DocumentId,
 
     pub display_list_builder: Option<DisplayListBuilder>,
+
+    pub color: ColorF,
 }
 
 impl Output {
@@ -40,6 +42,7 @@ impl Output {
             events_loop,
             document_id,
             display_list_builder: None,
+            color: ColorF::WHITE,
         }
     }
 
@@ -80,7 +83,7 @@ impl Output {
 
         let webrender_opts = webrender::RendererOptions {
             device_pixel_ratio,
-            clear_color: Some(ColorF::WHITE),
+            clear_color: None,
             debug_flags: webrender::DebugFlags::ECHO_DRIVER_MESSAGES,
             ..webrender::RendererOptions::default()
         };
@@ -137,7 +140,20 @@ impl Output {
         let pipeline_id = PipelineId(0, 0);
         if self.display_list_builder.is_none() {
             let (_, layout_size) = Self::get_size(&self.window);
-            let builder = DisplayListBuilder::new(pipeline_id, layout_size);
+            let mut builder = DisplayListBuilder::new(pipeline_id, layout_size);
+
+            use crate::util::HandyDandyRectBuilder;
+
+            let screen_size = self.get_inner_size().unwrap();
+            let all_screen = (0, 0).by(screen_size.width as i32, screen_size.height as i32);
+
+            let pipeline_id = PipelineId(0, 0);
+            let space_and_clip = SpaceAndClipInfo::root_scroll(pipeline_id);
+
+            builder.push_rect(
+                &CommonItemProperties::new(all_screen, space_and_clip),
+                self.color,
+            );
 
             self.display_list_builder = Some(builder);
         }

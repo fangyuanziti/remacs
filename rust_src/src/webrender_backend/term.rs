@@ -16,7 +16,8 @@ use crate::{
     },
     remacs_sys::{
         x_clear_end_of_line, x_clear_window_mouse_face, x_fix_overlapping_area,
-        x_get_glyph_overhangs, x_produce_glyphs, x_set_font, x_set_font_backend, x_write_glyphs,
+        x_get_glyph_overhangs, x_produce_glyphs, x_set_font, x_set_font_backend, x_set_left_fringe,
+        x_set_right_fringe, x_write_glyphs,
     },
 };
 
@@ -72,8 +73,8 @@ fn get_frame_parm_handlers() -> [frame_parm_handler; 45] {
         None,
         None,
         None,
-        None,
-        None,
+        Some(x_set_left_fringe),
+        Some(x_set_right_fringe),
         None,
         None,
         Some(x_set_font_backend),

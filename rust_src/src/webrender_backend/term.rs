@@ -10,15 +10,17 @@ use crate::{
     frame::LispFrameRef,
     lisp::{ExternalPtr, LispObject},
     remacs_sys::{
-        allocate_kboard, create_terminal, current_kboard, frame_parm_handler, glyph_row,
-        glyph_string, initial_kboard, output_method, redisplay_interface, terminal, xlispstrdup,
-        Fcons, Lisp_Frame, Lisp_Window, Qnil, Qwr, KBOARD,
+        allocate_kboard, create_terminal, current_kboard, draw_fringe_bitmap_params,
+        draw_window_fringes, frame_parm_handler, glyph_row, glyph_string, initial_kboard,
+        output_method, redisplay_interface, terminal, xlispstrdup, Fcons, Lisp_Frame, Lisp_Window,
+        Qnil, Qwr, KBOARD,
     },
     remacs_sys::{
         x_clear_end_of_line, x_clear_window_mouse_face, x_fix_overlapping_area,
         x_get_glyph_overhangs, x_produce_glyphs, x_set_font, x_set_font_backend, x_set_left_fringe,
         x_set_right_fringe, x_write_glyphs,
     },
+    windows::LispWindowRef,
 };
 
 pub type TerminalRef = ExternalPtr<terminal>;
@@ -112,7 +114,7 @@ lazy_static! {
             clear_window_mouse_face: Some(x_clear_window_mouse_face),
             get_glyph_overhangs: Some(x_get_glyph_overhangs),
             fix_overlapping_area: Some(x_fix_overlapping_area),
-            draw_fringe_bitmap: None,
+            draw_fringe_bitmap: Some(draw_fringe_bitmap),
             define_fringe_bitmap: None,
             destroy_fringe_bitmap: None,
             compute_glyph_string_overhangs: None,
@@ -134,12 +136,18 @@ lazy_static! {
 #[allow(unused_variables)]
 extern "C" fn update_window_begin(w: *mut Lisp_Window) {}
 
-#[allow(unused_variables)]
 extern "C" fn update_window_end(
-    w: *mut Lisp_Window,
-    cursor_no_p: bool,
-    mouse_face_overwritten_p: bool,
+    window: *mut Lisp_Window,
+    _cursor_no_p: bool,
+    _mouse_face_overwritten_p: bool,
 ) {
+    let mut window: LispWindowRef = window.into();
+
+    if window.pseudo_window_p() {
+        return;
+    }
+
+    unsafe { draw_window_fringes(window.as_mut(), true) };
 }
 
 extern "C" fn flush_display(f: *mut Lisp_Frame) {
@@ -162,6 +170,19 @@ extern "C" fn draw_glyph_string(s: *mut glyph_string) {
     };
 
     output.canvas().draw_glyph_string(s);
+}
+
+extern "C" fn draw_fringe_bitmap(
+    window: *mut Lisp_Window,
+    row: *mut glyph_row,
+    p: *mut draw_fringe_bitmap_params,
+) {
+    let window: LispWindowRef = window.into();
+    let frame: LispFrameRef = window.get_frame();
+
+    let output: OutputRef = unsafe { frame.output_data.wr.into() };
+
+    output.canvas().draw_fringe_bitmap(row, p);
 }
 
 #[allow(unused_variables)]

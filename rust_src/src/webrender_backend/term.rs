@@ -1,5 +1,6 @@
 use std::ptr;
 
+use glutin::event::{Event, WindowEvent};
 use webrender::api::*;
 
 use super::{
@@ -282,6 +283,61 @@ extern "C" fn clear_frame(f: *mut Lisp_Frame) {
     output.clear_display_list_builder();
 }
 
+use crate::remacs_sys::input_event;
+
+extern "C" fn read_input_event(terminal: *mut terminal, hold_quit: *mut input_event) -> i32 {
+    let terminal: TerminalRef = terminal.into();
+    let dpyinfo: DisplayInfoRef = unsafe { terminal.display_info.wr }.into();
+
+    let mut output = dpyinfo.get_inner().output;
+
+    let mut top_frame: LispObject = Qnil;
+
+    use crate::lists::{LispConsCircularChecks, LispConsEndChecks};
+
+    use crate::remacs_sys::Vframe_list;
+    for_each_frame!(f => {
+        let frame: LispFrameRef = f.into();
+        let frame_output: OutputRef = unsafe { frame.output_data.wr.into() };
+
+        if frame_output == output {
+            top_frame = frame.into();
+            break;
+        }
+    });
+
+    use crate::remacs_sys::kbd_buffer_store_event_hold;
+
+    let mut count = 0;
+
+    output.poll_events(|e: Event<()>| match e {
+        Event::WindowEvent {
+            event: WindowEvent::ReceivedCharacter(c),
+            ..
+        } => {
+            println!("event {}", c);
+            let mut iev = crate::remacs_sys::input_event {
+                _bitfield_1: crate::remacs_sys::input_event::new_bitfield_1(
+                    crate::remacs_sys::event_kind::ASCII_KEYSTROKE_EVENT,
+                    crate::remacs_sys::scroll_bar_part::scroll_bar_nowhere,
+                ),
+                code: c as u32,
+                modifiers: 0,
+                x: 0.into(),
+                y: 0.into(),
+                timestamp: 0,
+                frame_or_window: top_frame,
+                arg: Qnil,
+            };
+            unsafe { kbd_buffer_store_event_hold(&mut iev, hold_quit) };
+            count += 1;
+        }
+        _ => {}
+    });
+
+    count
+}
+
 fn wr_create_terminal(mut dpyinfo: DisplayInfoRef) -> TerminalRef {
     let terminal_ptr = unsafe {
         create_terminal(
@@ -299,6 +355,7 @@ fn wr_create_terminal(mut dpyinfo: DisplayInfoRef) -> TerminalRef {
     // Terminal hooks
     // Other hooks are NULL by default.
     terminal.clear_frame_hook = Some(clear_frame);
+    terminal.read_socket_hook = Some(read_input_event);
 
     terminal
 }

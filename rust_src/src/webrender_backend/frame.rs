@@ -33,6 +33,9 @@ pub fn create_frame(
     let mut output = Box::new(Output::new());
     output.set_display_info(dpyinfo);
 
+    use crate::remacs_sys::add_keyboard_wait_descriptor;
+    unsafe { add_keyboard_wait_descriptor(output.keyboard_fd) };
+
     // Remeber to destory the Output object when frame destoried.
     let output = Box::into_raw(output);
     frame.output_data.wr = output as *mut wr_output;

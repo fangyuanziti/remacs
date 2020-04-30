@@ -113,7 +113,7 @@ lazy_static! {
             write_glyphs: Some(x_write_glyphs),
             insert_glyphs: None,
             clear_end_of_line: Some(x_clear_end_of_line),
-            scroll_run_hook: None,
+            scroll_run_hook: Some(scroll_run),
             after_update_window_line_hook: Some(after_update_window_line),
             update_window_begin_hook: Some(update_window_begin),
             update_window_end_hook: Some(update_window_end),
@@ -282,6 +282,10 @@ extern "C" fn clear_frame(f: *mut Lisp_Frame) {
 
     output.clear_display_list_builder();
 }
+
+use crate::remacs_sys::run;
+
+extern "C" fn scroll_run(w: *mut Lisp_Window, run: *mut run) {}
 
 use crate::remacs_sys::input_event;
 

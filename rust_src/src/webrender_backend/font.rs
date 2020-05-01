@@ -82,7 +82,7 @@ impl LispFontLike {
                 "Monospace" => Some(FamilyName::Monospace),
                 "Cursive" => Some(FamilyName::Cursive),
                 "Fantasy" => Some(FamilyName::Fantasy),
-                f => Some(FamilyName::Title(f.to_string())),
+                f => Some(FamilyName::Title(f.to_string().replace("-", "\\-"))),
             }
         }
     }

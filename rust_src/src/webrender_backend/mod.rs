@@ -7,3 +7,4 @@ pub mod term;
 
 mod draw_canvas;
 mod glyph;
+mod texture;

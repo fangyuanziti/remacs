@@ -177,7 +177,15 @@ impl Output {
 
                 match e {
                     Event::WindowEvent {
+                        event: WindowEvent::KeyboardInput { .. },
+                        ..
+                    }
+                    | Event::WindowEvent {
                         event: WindowEvent::ReceivedCharacter(_),
+                        ..
+                    }
+                    | Event::WindowEvent {
+                        event: WindowEvent::ModifiersChanged(_),
                         ..
                     } => {
                         event_tx.send(e.to_static().unwrap()).unwrap();

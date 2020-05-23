@@ -1,6 +1,7 @@
 use std::ptr;
 
-use glutin::event::{Event, WindowEvent};
+use glutin::event::{ElementState, Event, KeyboardInput, WindowEvent};
+
 use webrender::api::*;
 
 use super::{
@@ -323,7 +324,8 @@ extern "C" fn read_input_event(terminal: *mut terminal, hold_quit: *mut input_ev
     let terminal: TerminalRef = terminal.into();
     let dpyinfo: DisplayInfoRef = unsafe { terminal.display_info.wr }.into();
 
-    let mut output = dpyinfo.get_inner().output;
+    let mut dpyinfo = dpyinfo.get_inner();
+    let mut output = dpyinfo.output;
 
     let mut top_frame: LispObject = Qnil;
 
@@ -346,26 +348,44 @@ extern "C" fn read_input_event(terminal: *mut terminal, hold_quit: *mut input_ev
 
     output.poll_events(|e| match e {
         Event::WindowEvent {
-            event: WindowEvent::ReceivedCharacter(c),
+            event: WindowEvent::ReceivedCharacter(key_code),
             ..
         } => {
-            println!("event {}", c);
-            let mut iev = crate::remacs_sys::input_event {
-                _bitfield_1: crate::remacs_sys::input_event::new_bitfield_1(
-                    crate::remacs_sys::event_kind::ASCII_KEYSTROKE_EVENT,
-                    crate::remacs_sys::scroll_bar_part::scroll_bar_nowhere,
-                ),
-                code: c as u32,
-                modifiers: 0,
-                x: 0.into(),
-                y: 0.into(),
-                timestamp: 0,
-                frame_or_window: top_frame,
-                arg: Qnil,
-            };
-            unsafe { kbd_buffer_store_event_hold(&mut iev, hold_quit) };
-            count += 1;
+            if let Some(mut iev) = dpyinfo.keyboard_processor.receive_char(key_code, top_frame) {
+                unsafe { kbd_buffer_store_event_hold(&mut iev, hold_quit) };
+                count += 1;
+            }
         }
+
+        Event::WindowEvent {
+            event: WindowEvent::ModifiersChanged(state),
+            ..
+        } => {
+            dpyinfo.keyboard_processor.change_modifiers(state);
+        }
+
+        Event::WindowEvent {
+            event:
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state,
+                            virtual_keycode: Some(key_code),
+                            ..
+                        },
+                    ..
+                },
+            ..
+        } => match state {
+            ElementState::Pressed => {
+                if let Some(mut iev) = dpyinfo.keyboard_processor.key_pressed(key_code, top_frame) {
+                    unsafe { kbd_buffer_store_event_hold(&mut iev, hold_quit) };
+                    count += 1;
+                }
+            }
+            ElementState::Released => dpyinfo.keyboard_processor.key_released(),
+        },
+
         _ => {}
     });
 

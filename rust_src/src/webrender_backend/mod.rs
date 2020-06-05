@@ -6,6 +6,7 @@ pub mod keyboard;
 pub mod output;
 pub mod term;
 
+mod cursor;
 mod draw_canvas;
 mod glyph;
 mod texture;
